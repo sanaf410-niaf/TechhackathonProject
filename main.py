@@ -207,10 +207,11 @@ async def trigger_bot_command(payload: dict):
     command_text = payload.get("command", "")
     async with aiohttp.ClientSession() as session:
         try:
-            async with session.post("http://localhost:8001/webhook", json={"command": command_text}) as resp:
+            # Change 'localhost' to '127.0.0.1' here:
+            async with session.post("http://127.0.0.1:8001/webhook", json={"command": command_text}) as resp:
                 if resp.status == 200:
                     data = await resp.json()
                     return {"status": "success", "response": data.get("response", "")}
                 return {"status": "error", "message": "Bot process did not respond correctly."}
-        except Exception:
-            return {"status": "error", "response": "Bot process starting up... Please try again."}
+        except Exception as e:
+            return {"status": "error", "message": f"Could not connect to bot process: {str(e)}"}
