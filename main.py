@@ -14,8 +14,6 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # --- TIME ACCELERATOR (60x Speed) ---
-# 1 real second = 1 simulated minute
-# 2 real minutes = 2 simulated hours
 APP_START_TIME = datetime.now()
 TIME_MULTIPLIER = 60
 
@@ -161,13 +159,11 @@ def get_usage():
 def get_alerts():
     alerts = []
     now = get_now()
-    
     is_after_hours = now.hour < 9 or now.hour >= 17
     
     room_devices = {room: [] for room in rooms_list}
     for d in devices.values():
         room_devices[d["room"]].append(d)
-        
         if d["status"] == "on" and is_after_hours:
             alerts.append({
                 "timestamp": now.strftime("%I:%M:%S %p"), 
@@ -177,13 +173,11 @@ def get_alerts():
     for room, devs in room_devices.items():
         all_on = True
         all_over_2_hours = True
-        
         for d in devs:
             if d["status"] != "on" or not d["activated_at"]:
                 all_on = False
                 all_over_2_hours = False
                 break
-            
             try:
                 duration = now - datetime.fromisoformat(d["activated_at"])
                 if duration.total_seconds() < 7200:
@@ -196,7 +190,6 @@ def get_alerts():
                 "timestamp": now.strftime("%I:%M:%S %p"),
                 "message": f"Critical Waste: EVERY device in {room} has been ON continuously for over 2 hours!"
             })
-            
     return alerts
 
 @app.post("/api/bot-trigger")
@@ -204,12 +197,11 @@ async def trigger_bot_command(payload: dict):
     command_text = payload.get("command", "")
     async with aiohttp.ClientSession() as session:
         try:
-            # FIXED: Routers matched to target internal container port mapping architecture
             async with session.post("http://127.0.0.1:8001/webhook", json={"command": command_text}) as resp:
                 if resp.status == 200:
                     data = await resp.json()
-                    return {"status": "success", "response": data.get("response", "")}
-                return {"status": "success", "response": f"Command sent, but process returned status code {resp.status}."}
+                    return {"status": "success", "response": data.get("response", "No response text found.")}
+                return {"status": "error", "message": f"Bot process returned status code {resp.status}."}
         except Exception as e:
-            # Safety fallback so UI doesn't crash if bot threads are recycling
-            return {"status": "success", "response": f"Processing background webhook command: '{command_text}'"}
+            # Displays real system errors back to your UI to let you trace issues transparently
+            return {"status": "error", "message": f"Internal system routing exception: {str(e)}"}
