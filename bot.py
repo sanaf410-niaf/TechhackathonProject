@@ -105,8 +105,8 @@ async def run_webhook_bridge():
     await site.start()
     print("🔌 Webhook Bridge explicitly listening on http://127.0.0.1:8001")
 
-# --- PROACTIVE AI ALERTS ---
-@tasks.loop(seconds=5) 
+# --- PROACTIVE AI ALERTS (Rate-Limit Safety Adjusted to 30s) ---
+@tasks.loop(seconds=30) 
 async def proactive_alert_broadcaster():
     global last_alert_hash
     await client.wait_until_ready()
@@ -144,7 +144,6 @@ async def main():
             await client.start(TOKEN)
     else:
         print("❌ ERROR: No Discord token configuration properties profile found.")
-        # Keep the web server alive even if there's no Discord token
         while True:
             await asyncio.sleep(3600)
 
