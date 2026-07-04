@@ -203,5 +203,4 @@ async def trigger_bot_command(payload: dict):
                     return {"status": "success", "response": data.get("response", "No response text found.")}
                 return {"status": "error", "message": f"Bot process returned status code {resp.status}."}
         except Exception as e:
-            # Displays real system errors back to your UI to let you trace issues transparently
             return {"status": "error", "message": f"Internal system routing exception: {str(e)}"}

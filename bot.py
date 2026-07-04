@@ -23,7 +23,8 @@ intents = discord.Intents.default()
 intents.message_content = True
 client = discord.Client(intents=intents)
 
-API_BASE = "http://127.0.0.1:10000" 
+# FIX: Changed from 10000 to 8000 to align with your Uvicorn startup configuration port
+API_BASE = "http://127.0.0.1:8000" 
 main_loop = None
 last_alert_hash = None 
 
@@ -52,16 +53,20 @@ async def process_telemetry_flow(command_string: str):
     
     if cmd == "!status" or cmd == "!usage" or cmd.startswith("!room"):
         async with aiohttp.ClientSession() as session:
-            async with session.get(f"{API_BASE}/api/devices") as dev_res, session.get(f"{API_BASE}/api/usage") as use_res:
-                if dev_res.status == 200 and use_res.status == 200:
-                    devices = await dev_res.json()
-                    usage = await use_res.json()
-                    grid_state = json.dumps({"devices": devices, "usage": usage})
-                    
-                    return await generate_humanized_response(
-                        grid_state, 
-                        f"The user typed the command: '{cmd}'. Give them the info they requested based on the data."
-                    )
+            try:
+                async with session.get(f"{API_BASE}/api/devices") as dev_res, session.get(f"{API_BASE}/api/usage") as use_res:
+                    if dev_res.status == 200 and use_res.status == 200:
+                        devices = await dev_res.json()
+                        usage = await use_res.json()
+                        grid_state = json.dumps({"devices": devices, "usage": usage})
+                        
+                        return await generate_humanized_response(
+                            grid_state, 
+                            f"The user typed the command: '{cmd}'. Give them the info they requested based on the data."
+                        )
+            except Exception as e:
+                return f"⚠️ Bot failed to read local backend telemetry: {str(e)}"
+                
     return "🤖 I don't recognize that command! Try asking me for `!status`, `!usage`, or check a room like `!room Work Room 1`."
 
 async def dispatch_via_discord_core(command: str, reply: str):
@@ -89,12 +94,15 @@ async def on_message(message):
             await message.channel.send(reply)
 
 async def handle_ui_post(request):
-    data = await request.json()
-    command = data.get("command", "")
-    reply = await process_telemetry_flow(command)
-    if main_loop:
-        asyncio.run_coroutine_threadsafe(dispatch_via_discord_core(command, reply), main_loop)
-    return web.json_response({"status": "success", "response": reply})
+    try:
+        data = await request.json()
+        command = data.get("command", "")
+        reply = await process_telemetry_flow(command)
+        if main_loop:
+            asyncio.run_coroutine_threadsafe(dispatch_via_discord_core(command, reply), main_loop)
+        return web.json_response({"status": "success", "response": reply})
+    except Exception as e:
+        return web.json_response({"status": "error", "message": str(e)}, status=500)
 
 async def run_webhook_bridge():
     app = web.Application()
@@ -105,8 +113,8 @@ async def run_webhook_bridge():
     await site.start()
     print("🔌 Webhook Bridge explicitly listening on http://127.0.0.1:8001")
 
-# --- PROACTIVE AI ALERTS (Rate-Limit Safety Adjusted to 30s) ---
-@tasks.loop(seconds=30) 
+# --- PROACTIVE AI ALERTS ---
+@tasks.loop(seconds=5) 
 async def proactive_alert_broadcaster():
     global last_alert_hash
     await client.wait_until_ready()
