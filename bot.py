@@ -8,7 +8,7 @@ import json
 from google import genai
 from dotenv import load_dotenv
 
-# Load credentials
+# Load credentials (local-only fallback)
 load_dotenv()
 TOKEN = os.getenv("DISCORD_TOKEN")
 GEMINI_KEY = os.getenv("GEMINI_API_KEY")
@@ -23,14 +23,14 @@ intents = discord.Intents.default()
 intents.message_content = True
 client = discord.Client(intents=intents)
 
-API_BASE = "http://127.0.0.1:8000"
+API_BASE = "http://127.0.0.1:10000" # Updated to match Render default port configuration
 main_loop = None
 last_alert_hash = None 
 
 async def generate_humanized_response(raw_data: str, context: str) -> str:
     """Feeds raw backend JSON into the LLM to generate a conversational response."""
     if not ai_client:
-        return "🤖 **System Error:** GEMINI_API_KEY is missing from the .env file!"
+        return "🤖 **System Error:** GEMINI_API_KEY is missing from environment configurations!"
     
     system_prompt = (
         "You are the friendly, helpful AI Energy Manager for our office. "
@@ -105,11 +105,11 @@ async def run_webhook_bridge():
     app.router.add_post('/webhook', handle_ui_post)
     runner = web.AppRunner(app)
     await runner.setup()
-    site = web.TCPSite(runner, 'localhost', 8001)
+    # FIXED: Bound explicitly to 127.0.0.1 loopback for clean internal Docker container routing
+    site = web.TCPSite(runner, '127.0.0.1', 8001)
     await site.start()
 
 # --- PROACTIVE AI ALERTS ---
-# Changed to 5 seconds to keep up with the 60x Time Accelerator!
 @tasks.loop(seconds=5) 
 async def proactive_alert_broadcaster():
     global last_alert_hash
@@ -146,7 +146,8 @@ async def proactive_alert_broadcaster():
                         last_alert_hash = None
         except Exception: pass
 
+# --- SAFE ENV PRODUCTION RUNNER ---
 if TOKEN:
     client.run(TOKEN)
 else:
-    print("❌ ERROR: No Discord token payload configured inside the local .env setup profile target.")
+    print("❌ ERROR: No Discord token payload configured inside the environment setup profiles.")
