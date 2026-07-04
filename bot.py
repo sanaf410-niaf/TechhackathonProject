@@ -23,8 +23,13 @@ intents = discord.Intents.default()
 intents.message_content = True
 client = discord.Client(intents=intents)
 
-# FIX: Changed from 10000 to 8000 to align with your Uvicorn startup configuration port
-API_BASE = "http://127.0.0.1:8000" 
+# 🌐 UNIVERSAL INTER-PROCESS ROUTING MATRIX
+# Render-এ রান হলে এটি কন্টেইনারের ইন্টারনাল পোর্ট ১০০০০ ট্র‍্যাক করবে, আর পিসিতে ৮০০০।
+if os.getenv("RENDER"):
+    API_BASE = f"http://0.0.0.0:{os.getenv('PORT', '10000')}"
+else:
+    API_BASE = "http://127.0.0.1:8000"
+
 main_loop = None
 last_alert_hash = None 
 
@@ -109,9 +114,12 @@ async def run_webhook_bridge():
     app.router.add_post('/webhook', handle_ui_post)
     runner = web.AppRunner(app)
     await runner.setup()
-    site = web.TCPSite(runner, '127.0.0.1', 8001)
+    
+    # লোকালহোস্ট ও ক্লাউড এনভায়রনমেন্টের জন্য অ্যাড্রেস লিসেনিং বাইন্ড ফিক্স
+    bind_ip = "127.0.0.1" if not os.getenv("RENDER") else "0.0.0.0"
+    site = web.TCPSite(runner, bind_ip, 8001)
     await site.start()
-    print("🔌 Webhook Bridge explicitly listening on http://127.0.0.1:8001")
+    print(f"🔌 Webhook Bridge explicitly listening on http://{bind_ip}:8001")
 
 # --- PROACTIVE AI ALERTS ---
 @tasks.loop(seconds=5) 

@@ -197,7 +197,9 @@ async def trigger_bot_command(payload: dict):
     command_text = payload.get("command", "")
     async with aiohttp.ClientSession() as session:
         try:
-            async with session.post("http://127.0.0.1:8001/webhook", json={"command": command_text}) as resp:
+            # ক্লাউড ও লোকাল উভয়ের জন্য গেটওয়ে ডাইরেক্ট রাউটিং ফিক্স
+            target_host = "http://127.0.0.1:8001" if not os.getenv("RENDER") else "http://0.0.0.0:8001"
+            async with session.post(f"{target_host}/webhook", json={"command": command_text}) as resp:
                 if resp.status == 200:
                     data = await resp.json()
                     return {"status": "success", "response": data.get("response", "No response text found.")}
